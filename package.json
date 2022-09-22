@@ -1,0 +1,17 @@
+{
+  "name": "grating-allowance-for-account-hybrid-approach",
+  "version": "1.0.0",
+  "description": "granting allowance for an account using ERC standard calls",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "abi castro",
+  "license": "ISC",
+  "dependencies": {
+    "@hashgraph/sdk": "^2.18.2",
+    "@openzeppelin/contracts": "^4.7.3",
+    "dotenv": "^16.0.2",
+    "solc": "^0.8.17"
+  }
+}
