@@ -1,9 +1,9 @@
-const { Client, AccountId, PrivateKey, HbarUnit, Hbar, ContractCallQuery, ContractFunctionParameters, TokenAssociateTransaction } = require("@hashgraph/sdk");
+const { Client, AccountId, PrivateKey, Hbar, ContractFunctionParameters } = require("@hashgraph/sdk");
 require("dotenv").config();
 const fs = require("fs");
-const { createFungibleToken, sendToken, sendApprovedToken } = require("./services/hederaTokenService");
+const { createFungibleToken, sendToken, sendApprovedToken, associateToken } = require("./services/hederaTokenService");
 const { createAccount } = require("./services/hederaAccountService");
-const { tokenInfoQuery } = require("./services/queries");
+const { tokenInfoQuery, checkBalance } = require("./services/queries");
 const { deployContract, executeContractFunction } = require("./services/hederaSmartContractService");
 
 
@@ -23,22 +23,22 @@ client.setDefaultMaxTransactionFee(new Hbar(100));
 */
 const grantAllowanceExample = async () => {
   // create treasury's, alice's, and bob's accounts
-  const [treasureyAccId, treasuryAccPvKey] = await createAccount(client, 50);
-  console.log(`- Treasury's account: https://hashscan.io/#/testnet/account/${treasureyAccId}`);
-  console.log(`- Treausry Account Private Key: ${treasuryAccPvKey}\n`);
+  const [treasuryAccId, treasuryAccPvKey] = await createAccount(client, 50);
+  console.log(`- Treasury's account: https://hashscan.io/#/testnet/account/${treasuryAccId}`);
   const [aliceAccId, aliceAccPvKey] = await createAccount(client, 50);
-  console.log(`- - Alice's account: https://hashscan.io/#/testnet/account/${aliceAccId}`);
-  console.log(`- Alice Account Private Key: ${aliceAccPvKey}\n`);
+  console.log(`- Alice's account: https://hashscan.io/#/testnet/account/${aliceAccId}`);
   const [bobAccId, bobAccPvKey] = await createAccount(client, 50);
-  console.log(`Bob's account: https://hashscan.io/#/testnet/account/${bobAccId}`);
-  console.log(`- Bob Account Private Key: ${bobAccPvKey}`);
+  console.log(`- Bob's account: https://hashscan.io/#/testnet/account/${bobAccId}\n`);
 
   const supplyKey = PrivateKey.generateED25519();
 
   // create token collection and print initial supply
-  const [tokenId, tokenIdInSolidityFormat] = await createFungibleToken(client, treasureyAccId, supplyKey, treasuryAccPvKey, 100);
+  const [tokenId, tokenIdInSolidityFormat] = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'Popsicle', 'POP');
   const tokenInfo = await tokenInfoQuery(tokenId, client);
-  console.log(`Initial token supply: ${tokenInfo.totalSupply.low}`);
+  console.log(`Initial token supply: ${tokenInfo.totalSupply.low}\n`);
+
+  // Bob must associate to recieve token
+  await associateToken(client, tokenId, bobAccId, bobAccPvKey)
 
   /*
     * Read compiled byte code
@@ -50,62 +50,67 @@ const grantAllowanceExample = async () => {
   const gasLimit = 1000000;
   const [contractId, contractSolidityAddress] = await deployContract(client, bytecode, gasLimit);
 
-  const tokenAssociateTx = new TokenAssociateTransaction()
-    .setTokenIds([tokenId])
-    .setAccountId(aliceAccId)
-    .freezeWith(client);
-  const tokenAssociateSign = await tokenAssociateTx.sign(aliceAccPvKey);
-  const tokenAssociateSubmit = await tokenAssociateSign.execute(client);
-  const tokenAssociateRx = await tokenAssociateSubmit.getReceipt(client);
-  console.log(`- Alice associated with token: ${tokenAssociateRx.status}`);
-
-  const tokenAssociateTxBob = new TokenAssociateTransaction()
-    .setTokenIds([tokenId])
-    .setAccountId(bobAccId)
-    .freezeWith(client);
-  const tokenAssociateSignBob = await tokenAssociateTxBob.sign(bobAccPvKey);
-  const tokenAssociateSubmitBob = await tokenAssociateSignBob.execute(client);
-  const tokenAssociateRxBob = await tokenAssociateSubmitBob.getReceipt(client);
-  console.log(`- Bob associated with token: ${tokenAssociateRxBob.status}`);
-
-  console.log(`- Send tokens to Alice to test association`)
-  await sendToken(client, tokenId, treasureyAccId, aliceAccId, 3, treasureyAccId, treasuryAccPvKey);
-
-  
   // set oeprator to be treasury account (treasury account is now the caller of smart contract)
-  client.setOperator(treasureyAccId, treasuryAccPvKey);
+  client.setOperator(treasuryAccId, treasuryAccPvKey);
 
-  // Treasury account grants an approval to alice to transfer from it's own account using IERC20(token).approve
-  // Sets amount as the allowance of spender over the caller's tokens.
+  /*
+   * Setting the necessary paramters to execute the approve contract function
+   * tokenIdInSolidityFormat is the solidity address of the token we are granting an approval for
+   * aliceAccId is the solidity address of the spender
+   * amount is the amount we allow alice to spend on behalf of the treasury account
+  */
   const approveParams = new ContractFunctionParameters()
     .addAddress(tokenIdInSolidityFormat)
     .addAddress(aliceAccId.toSolidityAddress())
-    .addUint256(5);
-  const contractFunctionResult = await executeContractFunction(
+    .addUint256(50);
+
+  await executeContractFunction(
     client,
     contractId,
-    40_00_000,
+    4_000_000,
     'approve',
     approveParams,
     treasuryAccPvKey);
 
-  // set operator to be alice account as she is doing the transfer on the treasurys behalf (alice is caller of SC)
+  const allowanceParams = new ContractFunctionParameters()
+    .addAddress(tokenIdInSolidityFormat)
+    .addAddress(treasuryAccId.toSolidityAddress())
+    .addAddress(aliceAccId.toSolidityAddress());
+  
+  // check the allowance
+  const contractFunctionResult = await executeContractFunction(
+    client,
+    contractId,
+    4_000_000,
+    'checkAllowance',
+    allowanceParams,
+    treasuryAccPvKey);
+  console.log(`Alice has an allowance of ${contractFunctionResult.getUint256(0)}`);
+
+  // set the client back to the operator account
+  client.setOperator(operatorAccountId, operatorPrivateKey);
+  await checkBalance(treasuryAccId, tokenId, client);
+  await checkBalance(bobAccId, tokenId, client);
+
   client.setOperator(aliceAccId, aliceAccPvKey);
+  const transferFromParams = new ContractFunctionParameters()
+  .addAddress(tokenIdInSolidityFormat)
+  .addAddress(treasuryAccId.toSolidityAddress())
+  .addAddress(bobAccId.toSolidityAddress())
+  .addUint256(30);
 
-  // Alice transfers to another account (Bob in our case) 3 FT that Treasury account holds
-  // const transferFromParams = new ContractFunctionParameters()
-  //   .addAddress(aliceAccId.toSolidityAddress())
-  //   .addAddress(bobAccId.toSolidityAddress())
-  //   .addInt256(3);
-  // const contractFunctionResult2 = await executeContractFunction(
-  //   client,
-  //   contractId,
-  //   400_000,
-  //   'transferFrom',
-  //   transferFromParams);
+  await executeContractFunction(
+    client,
+    contractId,
+    4_000_000,
+    'transferFrom',
+    transferFromParams,
+    aliceAccPvKey);
 
-  // TESTING:
-  await sendApprovedToken(client, tokenId, treasureyAccId, bobAccId, 3, aliceAccId, aliceAccPvKey)
+  //await sendApprovedToken(client, tokenId, treasuryAccId, bobAccId, 7, aliceAccId, aliceAccPvKey);
+
+  await checkBalance(treasuryAccId, tokenId, client);
+  await checkBalance(bobAccId, tokenId, client);
 
   client.close();
 }

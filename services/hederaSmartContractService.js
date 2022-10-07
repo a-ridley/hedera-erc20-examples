@@ -20,19 +20,20 @@ const deployContract = async (client, bytecode, gasLimit) => {
   const contractSolidityAddress = contractId.toSolidityAddress();
 
   console.log(`- The smart contract Id is ${contractId}`);
-  console.log(`- The smart contract Id in Solidity format is ${contractSolidityAddress}`);
+  console.log(`- The smart contract Id in Solidity format is ${contractSolidityAddress}\n`);
 
   return [contractId, contractSolidityAddress];
 }
 
-const executeContractFunction = async (client, contractId, gasLimit, functionName, functionParameters, ownerAccPvKey) => {
+const executeContractFunction = async (client, contractId, gasLimit, functionName, functionParameters, accountPvKey) => {
   const contractCallQueryTx = new ContractExecuteTransaction()
     .setContractId(contractId)
     .setGas(gasLimit)
     .setFunction(functionName, functionParameters)
     .freezeWith(client);
 
-  const txnResponse = await contractCallQueryTx.execute(client);
+  const contractCallQueryTxSigned = await contractCallQueryTx.sign(accountPvKey);
+  const txnResponse = await contractCallQueryTxSigned.execute(client);
   const txRecord = await txnResponse.getRecord(client);
 
 	const recQuery = await new TransactionRecordQuery()
@@ -40,11 +41,10 @@ const executeContractFunction = async (client, contractId, gasLimit, functionNam
 		.setIncludeChildren(true)
 		.execute(client);
 
-  console.log(`- Token ${functionName}: ${txRecord.receipt.status}`);
 	console.log(
-		`\n- Contract call for FT ${functionName} (check in Hashscan): ${recQuery.receipt.status.toString()}`
+		`\n- Contract call for FT ${functionName} (check in Hashscan) was a: ${recQuery.receipt.status.toString()} transaction id: ${recQuery.transactionId}`
 	);
-
+    return txRecord.contractFunctionResult;
 }
 
 module.exports = { deployContract, executeContractFunction };

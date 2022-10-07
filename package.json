@@ -4,12 +4,13 @@
   "description": "granting allowance for an account using ERC standard calls",
   "main": "index.js",
   "scripts": {
+    "start": "npx solc --bin contracts/*.sol -o binaries && node index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "abi castro",
   "license": "ISC",
   "dependencies": {
-    "@hashgraph/sdk": "^2.18.2",
+    "@hashgraph/sdk": "^2.18.3",
     "@openzeppelin/contracts": "^4.7.3",
     "dotenv": "^16.0.2",
     "solc": "^0.8.17"

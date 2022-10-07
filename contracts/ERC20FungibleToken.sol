@@ -1,29 +1,34 @@
 // SPDX-License-Identifier: Apache-2.0
 pragma solidity ^0.8.0;
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+
+import "../node_modules/@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract ERC20FungibleToken {
+  function transferFrom(address token, address sender, address recipient, uint256 amount) public returns (bool result) {
+        (bool success, ) = token.delegatecall(
+          abi.encodeWithSelector(
+              IERC20.transferFrom.selector,
+              sender,
+              recipient,
+              amount
+          )
+      );
+      return success;
+  }
 
-    function name(address token) public view returns(string memory) {
-        return IERC20Metadata(token).name();
-    }
+  function checkAllowance(address token, address owner, address spender) public view returns (uint256){
+      return IERC20(token).allowance(owner, spender);
+  }
 
-    function symbol(address token) public view returns(string memory) {
-        return IERC20Metadata(token).symbol();
-    }
-
-    function transferFrom(address token, address sender, address recipient, uint256 amount) public {
-        IERC20(token).transferFrom(sender, recipient, amount);
-    }
-
-    function allowance(address token, address owner, address spender) public view {
-        IERC20(token).allowance(owner, spender);
-    }
-
-    function approve(address token, address spender, uint256 amount) public {
-        IERC20(token).approve(spender, amount);
-    }
-    
-    fallback () external{}
+  function approve(address token, address spender, uint256 amount) public returns (bool result) {
+      (bool success, ) = token.delegatecall(
+          abi.encodeWithSelector(
+              IERC20.approve.selector,
+              spender,
+              amount
+          )
+      );
+      return success;
+  }
+  fallback () external{}
 }
