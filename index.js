@@ -92,6 +92,7 @@ const grantAllowanceExample = async () => {
   await checkBalance(treasuryAccId, tokenId, client);
   await checkBalance(bobAccId, tokenId, client);
 
+  // make alice the client to excute the contract call.
   client.setOperator(aliceAccId, aliceAccPvKey);
   const transferFromParams = new ContractFunctionParameters()
   .addAddress(tokenIdInSolidityFormat)
