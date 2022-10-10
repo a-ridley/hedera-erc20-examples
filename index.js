@@ -33,7 +33,7 @@ const grantAllowanceExample = async () => {
   const supplyKey = PrivateKey.generateED25519();
 
   // create token collection and print initial supply
-  const [tokenId, tokenIdInSolidityFormat] = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'Popsicle', 'POP');
+  const [tokenId, tokenIdInSolidityFormat] = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'HBAR ROCKS', 'HROCK');
   const tokenInfo = await tokenInfoQuery(tokenId, client);
   console.log(`Initial token supply: ${tokenInfo.totalSupply.low}\n`);
 
