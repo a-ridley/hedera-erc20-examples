@@ -108,10 +108,41 @@ const grantAllowanceExample = async () => {
     transferFromParams,
     aliceAccPvKey);
 
-  //await sendApprovedToken(client, tokenId, treasuryAccId, bobAccId, 7, aliceAccId, aliceAccPvKey);
-
   await checkBalance(treasuryAccId, tokenId, client);
   await checkBalance(bobAccId, tokenId, client);
+
+  // set oeprator to be treasury account (treasury account is now the caller of smart contract)
+  client.setOperator(treasuryAccId, treasuryAccPvKey);
+  
+  // remove alice allowance
+  const removeApproveParams = new ContractFunctionParameters()
+  .addAddress(tokenIdInSolidityFormat)
+  .addAddress(aliceAccId.toSolidityAddress())
+  .addUint256(0);
+
+await executeContractFunction(
+  client,
+  contractId,
+  4_000_000,
+  'approve',
+  removeApproveParams,
+  treasuryAccPvKey);
+
+  // check allowance after it has been removed
+  const checkallowanceParams = new ContractFunctionParameters()
+  .addAddress(tokenIdInSolidityFormat)
+  .addAddress(treasuryAccId.toSolidityAddress())
+  .addAddress(aliceAccId.toSolidityAddress());
+
+// check the allowance
+const contractFunctionRes = await executeContractFunction(
+  client,
+  contractId,
+  4_000_000,
+  'checkAllowance',
+  checkallowanceParams,
+  treasuryAccPvKey);
+console.log(`Alice has an allowance of ${contractFunctionRes.getUint256(0)}`);
 
   client.close();
 }
