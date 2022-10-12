@@ -1,17 +1,20 @@
-const { Client, AccountId, PrivateKey, Hbar, ContractFunctionParameters } = require("@hashgraph/sdk");
-require("dotenv").config();
-const fs = require("fs");
-const { createFungibleToken, sendToken, sendApprovedToken, associateToken } = require("./services/hederaTokenService");
-const { createAccount } = require("./services/hederaAccountService");
-const { tokenInfoQuery, checkBalance } = require("./services/queries");
-const { deployContract, executeContractFunction } = require("./services/hederaSmartContractService");
+import { Client, AccountId, PrivateKey, Hbar, ContractFunctionParameters } from "@hashgraph/sdk";
+import dotenv from "dotenv";
+import fs from "fs";
+import { createFungibleToken, associateToken } from "./services/hederaTokenService";
+import { createAccount } from "./services/hederaAccountService";
+import { tokenInfoQuery, checkAccountBalance } from "./services/queries";
+import { deployContract, executeContractFunction } from "./services/hederaSmartContractService";
 
+dotenv.config();
 
 // create your client
-const operatorAccountId = AccountId.fromString(process.env.OPERATOR_ACCOUNT_ID);
-const operatorPrivateKey = PrivateKey.fromString(
-  process.env.OPERATOR_PRIVATE_KEY
-);
+const accountIdString = process.env.OPERATOR_ACCOUNT_ID;
+const privateKeyString = process.env.OPERATOR_PRIVATE_KEY;
+if (accountIdString === undefined || privateKeyString === undefined ) { throw new Error('account id and private key in env file are empty')}
+
+const operatorAccountId = AccountId.fromString(accountIdString);
+const operatorPrivateKey = PrivateKey.fromString(privateKeyString);
 
 const client = Client.forTestnet().setOperator(operatorAccountId, operatorPrivateKey);
 client.setDefaultMaxTransactionFee(new Hbar(100));
@@ -33,7 +36,7 @@ const grantAllowanceExample = async () => {
   const supplyKey = PrivateKey.generateED25519();
 
   // create token collection and print initial supply
-  const [tokenId, tokenIdInSolidityFormat] = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'HBAR ROCKS', 'HROCK');
+  const { tokenId, tokenIdInSolidityFormat } = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'HBAR ROCKS', 'HROCK');
   const tokenInfo = await tokenInfoQuery(tokenId, client);
   console.log(`Initial token supply: ${tokenInfo.totalSupply.low}\n`);
 
@@ -85,12 +88,15 @@ const grantAllowanceExample = async () => {
     'checkAllowance',
     allowanceParams,
     treasuryAccPvKey);
-  console.log(`Alice has an allowance of ${contractFunctionResult.getUint256(0)}`);
+  
+  if (contractFunctionResult) {
+    console.log(`Alice has an allowance of ${contractFunctionResult.getUint256(0)}`);
+  }
 
   // set the client back to the operator account
   client.setOperator(operatorAccountId, operatorPrivateKey);
-  await checkBalance(treasuryAccId, tokenId, client);
-  await checkBalance(bobAccId, tokenId, client);
+  await checkAccountBalance(treasuryAccId, tokenId, client);
+  await checkAccountBalance(bobAccId, tokenId, client);
 
   // make alice the client to excute the contract call.
   client.setOperator(aliceAccId, aliceAccPvKey);
@@ -108,8 +114,8 @@ const grantAllowanceExample = async () => {
     transferFromParams,
     aliceAccPvKey);
 
-  await checkBalance(treasuryAccId, tokenId, client);
-  await checkBalance(bobAccId, tokenId, client);
+  await checkAccountBalance(treasuryAccId, tokenId, client);
+  await checkAccountBalance(bobAccId, tokenId, client);
 
   // set oeprator to be treasury account (treasury account is now the caller of smart contract)
   client.setOperator(treasuryAccId, treasuryAccPvKey);
@@ -142,7 +148,9 @@ const contractFunctionRes = await executeContractFunction(
   'checkAllowance',
   checkallowanceParams,
   treasuryAccPvKey);
-console.log(`Alice has an allowance of ${contractFunctionRes.getUint256(0)}`);
+if (contractFunctionRes) {
+  console.log(`Alice has an allowance of ${contractFunctionRes.getUint256(0)}`);
+}
 
   client.close();
 }

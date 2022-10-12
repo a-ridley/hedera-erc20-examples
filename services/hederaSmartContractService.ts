@@ -1,4 +1,4 @@
-const { ContractCreateFlow, ContractCallQuery, ContractFunctionParameters, Hbar, ContractExecuteTransaction, TransactionRecordQuery } = require('@hashgraph/sdk');
+import { ContractCreateFlow, ContractFunctionParameters, ContractExecuteTransaction, TransactionRecordQuery, Client, ContractId, PrivateKey } from '@hashgraph/sdk';
 
 /*
  * Stores the bytecode and deploys the contract to the Hedera network.
@@ -7,7 +7,7 @@ const { ContractCreateFlow, ContractCallQuery, ContractFunctionParameters, Hbar,
  * Note: This single call handles what FileCreateTransaction(), FileAppendTransaction() and
  * ContractCreateTransaction() classes do. 
 */
-const deployContract = async (client, bytecode, gasLimit) => {
+export const deployContract = async (client: Client, bytecode: string | Uint8Array, gasLimit: number) => {
   const contractCreateFlowTxn = new ContractCreateFlow()
     .setBytecode(bytecode)
     .setGas(gasLimit);
@@ -17,6 +17,8 @@ const deployContract = async (client, bytecode, gasLimit) => {
 
   const txnReceipt = await txnResponse.getReceipt(client);
   const contractId = txnReceipt.contractId;
+  if (contractId === null ) { throw new Error("Somehow contractId is null.");}
+
   const contractSolidityAddress = contractId.toSolidityAddress();
 
   console.log(`- The smart contract Id is ${contractId}`);
@@ -25,7 +27,7 @@ const deployContract = async (client, bytecode, gasLimit) => {
   return [contractId, contractSolidityAddress];
 }
 
-const executeContractFunction = async (client, contractId, gasLimit, functionName, functionParameters, accountPvKey) => {
+export const executeContractFunction = async (client: Client, contractId: string | ContractId, gasLimit: number, functionName: string, functionParameters: ContractFunctionParameters, accountPvKey: PrivateKey) => {
   const contractCallQueryTx = new ContractExecuteTransaction()
     .setContractId(contractId)
     .setGas(gasLimit)
@@ -44,7 +46,5 @@ const executeContractFunction = async (client, contractId, gasLimit, functionNam
 	console.log(
 		`\n- Contract call for FT ${functionName} (check in Hashscan) was a: ${recQuery.receipt.status.toString()} transaction id: ${recQuery.transactionId}`
 	);
-    return txRecord.contractFunctionResult;
+  return txRecord.contractFunctionResult;
 }
-
-module.exports = { deployContract, executeContractFunction };

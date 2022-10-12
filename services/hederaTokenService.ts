@@ -1,14 +1,17 @@
-const { TokenCreateTransaction, Hbar, TokenType, TransferTransaction, TransactionId, TokenAssociateTransaction } = require('@hashgraph/sdk');
+import { TokenCreateTransaction, Hbar, TokenType, TransferTransaction, TransactionId, TokenAssociateTransaction, Client, AccountId, PrivateKey, TokenId } from '@hashgraph/sdk';
 
-const createFungibleToken = async (
-  client,
-  treasureyAccId,
-  supplyKey,
-  treasuryAccPvKey,
-  initialSupply,
-  tokenName,
-  tokenSymbol,
-) => {
+export const createFungibleToken = async (
+  client: Client,
+  treasureyAccId: string | AccountId,
+  supplyKey: PrivateKey,
+  treasuryAccPvKey: PrivateKey,
+  initialSupply: number,
+  tokenName: string,
+  tokenSymbol: string,
+): Promise<{
+  tokenId: TokenId,
+  tokenIdInSolidityFormat: string
+}> => {
   /* 
     * Create a transaction with token type fungible
     * Returns Fungible Token Id and Token Id in solidity format
@@ -30,6 +33,10 @@ const createFungibleToken = async (
   const txnRx = await txnResponse.getReceipt(client);
   const txnStatus = txnRx.status.toString();
   const tokenId = txnRx.tokenId;
+  if (tokenId === null) {
+    throw new Error("Somehow tokenId is null");
+  }
+
   const tokenIdInSolidityFormat = tokenId.toSolidityAddress();
 
   console.log(
@@ -37,10 +44,13 @@ const createFungibleToken = async (
   );
   console.log(`Token Id in Solidity format: ${tokenIdInSolidityFormat}`);
 
-  return [tokenId, tokenIdInSolidityFormat];
+  return {
+    tokenId,
+    tokenIdInSolidityFormat,
+  };
 };
 
-const associateToken = async (client, tokenId, accountId, accountPrivateKey) => {
+export const associateToken = async (client: Client, tokenId: string | TokenId, accountId: string | AccountId, accountPrivateKey: PrivateKey) => {
   const tokenAssociateTx = new TokenAssociateTransaction()
   .setTokenIds([tokenId])
   .setAccountId(accountId)
@@ -51,7 +61,7 @@ const tokenAssociateRx = await tokenAssociateSubmit.getReceipt(client);
 console.log(`- Associated with token: ${tokenAssociateRx.status}`);
 } 
 
-const sendToken = async (client, tokenId, owner, reciever, sendBalance, spender, spenderPvKey) => {
+export const sendToken = async (client: Client, tokenId: string | TokenId, owner: string | AccountId, reciever: string | AccountId, sendBalance: number, spender: string | AccountId, spenderPvKey: PrivateKey) => {
   let hbarSendRx = [];
   try {
     if (client.operatorAccountId != null) {
@@ -75,7 +85,7 @@ const sendToken = async (client, tokenId, owner, reciever, sendBalance, spender,
 }
 
   //Note: The spender must either be set as the client or must set the TransactionId and sign it 
-const sendApprovedToken = async (client, tokenId, owner, reciever, sendBalance, spenderId, spenderKey) => {
+export const sendApprovedToken = async (client: Client, tokenId: string | TokenId, owner: string | AccountId, reciever: string | AccountId, sendBalance: number, spenderId: string | AccountId, spenderKey: PrivateKey) => {
   let hbarSendRx = null;
   try {
     if (client.operatorAccountId != null) {
@@ -99,5 +109,3 @@ const sendApprovedToken = async (client, tokenId, owner, reciever, sendBalance, 
 
   return hbarSendRx;
 }
-
-module.exports = { createFungibleToken, sendToken, sendApprovedToken, associateToken };

@@ -1,11 +1,13 @@
-const {
+import {
   PrivateKey,
   AccountCreateTransaction,
   Hbar,
-} = require('@hashgraph/sdk');
+  Client,
+  AccountId,
+} from '@hashgraph/sdk';
 
 // create an account with an initial balance
-const createAccount = async (client, initialBalance) => {
+export const createAccount = async (client: Client, initialBalance: number): Promise<[AccountId, PrivateKey]> => {
   const accountPrivateKey = PrivateKey.generateED25519();
 
   const response = await new AccountCreateTransaction()
@@ -15,7 +17,10 @@ const createAccount = async (client, initialBalance) => {
 
   const receipt = await response.getReceipt(client);
 
+  if (receipt.accountId === null) {
+    throw new Error("Somehow accountId is null.");
+  }
+
   return [receipt.accountId, accountPrivateKey];
 };
 
-module.exports = { createAccount };
