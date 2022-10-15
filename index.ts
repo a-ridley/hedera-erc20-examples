@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import fs from "fs";
 import { createFungibleToken, associateToken } from "./services/hederaTokenService";
 import { createAccount } from "./services/hederaAccountService";
-import { tokenInfoQuery, checkAccountBalance } from "./services/queries";
+import { checkAccountBalance } from "./services/queries";
 import { deployContract, executeContractFunction } from "./services/hederaSmartContractService";
 
 dotenv.config();
@@ -26,19 +26,23 @@ client.setDefaultMaxTransactionFee(new Hbar(100));
 */
 const grantAllowanceExample = async () => {
   // create treasury's, alice's, and bob's accounts
-  const [treasuryAccId, treasuryAccPvKey] = await createAccount(client, 50);
+  const [treasuryAccId, treasuryAccPvKey] = await createAccount(client, 100);
   console.log(`- Treasury's account: https://hashscan.io/#/testnet/account/${treasuryAccId}`);
-  const [aliceAccId, aliceAccPvKey] = await createAccount(client, 50);
+  console.log(`-Treasury's private key: ${treasuryAccId}\n`);
+  const [aliceAccId, aliceAccPvKey] = await createAccount(client, 100);
   console.log(`- Alice's account: https://hashscan.io/#/testnet/account/${aliceAccId}`);
-  const [bobAccId, bobAccPvKey] = await createAccount(client, 50);
+  const ALICE_ACCOUNT_IN_SOLIDITY_FORMAT = aliceAccId.toSolidityAddress();
+  console.log(`Alice, the spender, address in solidity format: ${ALICE_ACCOUNT_IN_SOLIDITY_FORMAT}`);
+  const [bobAccId, bobAccPvKey] = await createAccount(client, 100);
   console.log(`- Bob's account: https://hashscan.io/#/testnet/account/${bobAccId}\n`);
+  console.log(`- Bob's private key: ${bobAccPvKey}\n`);
 
   const supplyKey = PrivateKey.generateED25519();
 
-  // create token collection and print initial supply
+  // create token
   const { tokenId, tokenIdInSolidityFormat } = await createFungibleToken(client, treasuryAccId, supplyKey, treasuryAccPvKey, 100, 'HBAR ROCKS', 'HROCK');
-  const tokenInfo = await tokenInfoQuery(tokenId, client);
-  console.log(`Initial token supply: ${tokenInfo.totalSupply.low}\n`);
+
+  
 
   // Bob must associate to recieve token
   await associateToken(client, tokenId, bobAccId, bobAccPvKey)
@@ -58,13 +62,11 @@ const grantAllowanceExample = async () => {
 
   /*
    * Setting the necessary paramters to execute the approve contract function
-   * tokenIdInSolidityFormat is the solidity address of the token we are granting an approval for
-   * aliceAccId is the solidity address of the spender
-   * amount is the amount we allow alice to spend on behalf of the treasury account
   */
+  console.log(`------- Start approval ------\n`);
   const approveParams = new ContractFunctionParameters()
     .addAddress(tokenIdInSolidityFormat)
-    .addAddress(aliceAccId.toSolidityAddress())
+    .addAddress(ALICE_ACCOUNT_IN_SOLIDITY_FORMAT)
     .addUint256(50);
 
   await executeContractFunction(
@@ -78,7 +80,7 @@ const grantAllowanceExample = async () => {
   const allowanceParams = new ContractFunctionParameters()
     .addAddress(tokenIdInSolidityFormat)
     .addAddress(treasuryAccId.toSolidityAddress())
-    .addAddress(aliceAccId.toSolidityAddress());
+    .addAddress(ALICE_ACCOUNT_IN_SOLIDITY_FORMAT);
   
   // check the allowance
   const contractFunctionResult = await executeContractFunction(
@@ -100,6 +102,7 @@ const grantAllowanceExample = async () => {
 
   // make alice the client to excute the contract call.
   client.setOperator(aliceAccId, aliceAccPvKey);
+  console.log(`------- Start transfer ------\n`)
   const transferFromParams = new ContractFunctionParameters()
   .addAddress(tokenIdInSolidityFormat)
   .addAddress(treasuryAccId.toSolidityAddress())
@@ -117,13 +120,13 @@ const grantAllowanceExample = async () => {
   await checkAccountBalance(treasuryAccId, tokenId, client);
   await checkAccountBalance(bobAccId, tokenId, client);
 
-  // set oeprator to be treasury account (treasury account is now the caller of smart contract)
+  // set operator to be treasury account (treasury account is now the caller of the mart contract)
   client.setOperator(treasuryAccId, treasuryAccPvKey);
   
   // remove alice allowance
   const removeApproveParams = new ContractFunctionParameters()
   .addAddress(tokenIdInSolidityFormat)
-  .addAddress(aliceAccId.toSolidityAddress())
+  .addAddress(ALICE_ACCOUNT_IN_SOLIDITY_FORMAT)
   .addUint256(0);
 
 await executeContractFunction(
@@ -138,9 +141,8 @@ await executeContractFunction(
   const checkallowanceParams = new ContractFunctionParameters()
   .addAddress(tokenIdInSolidityFormat)
   .addAddress(treasuryAccId.toSolidityAddress())
-  .addAddress(aliceAccId.toSolidityAddress());
+  .addAddress(ALICE_ACCOUNT_IN_SOLIDITY_FORMAT);
 
-// check the allowance
 const contractFunctionRes = await executeContractFunction(
   client,
   contractId,

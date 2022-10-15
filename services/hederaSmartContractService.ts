@@ -42,9 +42,6 @@ export const executeContractFunction = async (client: Client, contractId: string
 		.setTransactionId(txRecord.transactionId)
 		.setIncludeChildren(true)
 		.execute(client);
-
-	console.log(
-		`\n- Contract call for FT ${functionName} (check in Hashscan) was a: ${recQuery.receipt.status.toString()} transaction id: ${recQuery.transactionId}`
-	);
+    
   return txRecord.contractFunctionResult;
 }
